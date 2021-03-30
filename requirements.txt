@@ -1,0 +1,7 @@
+google
+pandas
+datetime
+google-resumable-media
+google-cloud-storage
+google-cloud-bigquery
+requests
