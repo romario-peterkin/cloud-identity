@@ -1,29 +1,19 @@
-from google.cloud import bigquery
-from createDevices import createDevice
 import requests
 import json
-import time
-import requests
-import json
-import pprint
+import os
 import google.auth.transport.requests
 from google.oauth2 import service_account
+from google.cloud import secretmanager,bigquery
 
 
 REMOVABLE_STATES = ['Selling' , 'Trashed', 'Missing', 'Retired', 'Reserved', 'Stolen', 'Escalated to Legal/HR']
 SCOPES = ['https://www.googleapis.com/auth/cloud-identity.devices']
 BASE_URL = 'https://cloudidentity.googleapis.com/v1/'
-# Change this to the location of the service account key
-SA_FILE = '{path_to_file}'
 # Enter the administrator to call as here.
-ADMIN_EMAIL = '{admin_email@domain.com}'
-if not SA_FILE:
-  print('Please specify the location of the service account key file')
-if not ADMIN_EMAIL:
-  print('Please specify the email of the administrator to call as')
-if not SA_FILE or not ADMIN_EMAIL:
-  exit(-1)
-
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
+PROJECT_ID = os.environ.get('PROJECT_ID')
+SECRET_NAME = os.environ.get('SECRET_NAME') # "sa-key-cloud-identity-devices"
+SECRET_VERSION = f"projects/" + PROJECT_ID + "/secrets/" + SECRET_NAME + "/versions/latest"
 
 def getRemovableAssets():
     # Get Serial numbers of devices that need to be removed
@@ -92,12 +82,15 @@ def getDeviceNames(serialNumber):
         return row.name
     
 def create_delegated_credentials(user_email):
-  credentials = service_account.Credentials.from_service_account_file(
-      SA_FILE,
-      scopes=['https://www.googleapis.com/auth/cloud-identity.devices'])
+  sa_request = {"name": SECRET_VERSION}
+  secret_response = sm_client.access_secret_version(sa_request)
+  sa_key_secret = secret_response.payload.data.decode("UTF-8")
 
+  credentials = service_account.Credentials.from_service_account_info(
+      json.loads(sa_key_secret),
+      scopes=SCOPES
+  )
   delegated_credentials = credentials.with_subject(user_email)
-
   return delegated_credentials
 
 
@@ -137,10 +130,10 @@ def removeDevice(param):
 
 
 
+def removeSeparatedAssets(request, payload):
+  if __name__ == "__main__":
+      removableAssets = getRemovableAssets()
 
-if __name__ == "__main__":
-    removableAssets = getRemovableAssets()
-
-    for id in removableAssets:
-        deviceName = getDeviceNames(id)
-        removeDevice(deviceName)        
+      for id in removableAssets:
+          deviceName = getDeviceNames(id)
+          removeDevice(deviceName)        
